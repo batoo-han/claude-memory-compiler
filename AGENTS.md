@@ -516,3 +516,77 @@ The knowledge base is pure markdown with `[[wikilinks]]` - works natively in Obs
 ### Scaling Beyond Index-Guided Retrieval
 
 At ~2,000+ articles / ~2M+ tokens, the index becomes too large for the context window. At that point, add hybrid RAG (keyword + semantic search) as a retrieval layer before the LLM. See Karpathy's recommendation of `qmd` by Tobi Lutke for search at scale.
+
+---
+
+## Appendix: FTS5 Search & Indexing Tooling (Karpathy-style)
+
+In addition to the Claude Agent SDK-based `query.py` and `lint.py`, the vault includes FTS5-based tooling for SQLite-powered full-text search with BM25 ranking. These scripts are in `_meta/scripts/` and use the `.venv`:
+
+```
+_mnt/h/claude-memory-compiler/.venv/bin/python3
+```
+
+### Search
+
+```bash
+# FTS5 search with BM25 ranking
+.venv/bin/python3 _meta/scripts/vault_search.py search "attention kernel"
+
+# JSON output (for LLM tool use)
+.venv/bin/python3 _meta/scripts/vault_search.py search --json "query"
+
+# Filter by tag
+.venv/bin/python3 _meta/scripts/vault_search.py search --tag ml --limit 20 "transformer"
+
+# Web UI
+.venv/bin/python3 _meta/scripts/vault_search.py serve --port 8787
+```
+
+### Indexing
+
+```bash
+# Build the FTS5 search database
+.venv/bin/python3 _meta/scripts/vault_search.py index
+
+# Incremental (only changed files)
+.venv/bin/python3 _meta/scripts/vault_search.py index --incremental
+
+# Regenerate master/tag/topic indexes
+.venv/bin/python3 _meta/scripts/generate_indexes.py
+```
+
+### Structural Health Checks (free, no LLM)
+
+```bash
+# Full lint
+.venv/bin/python3 _meta/scripts/vault_lint.py
+
+# Specific check
+.venv/bin/python3 _meta/scripts/vault_lint.py --check links
+
+# JSON output
+.venv/bin/python3 _meta/scripts/vault_lint.py --json
+
+# Auto-fix safe issues
+.venv/bin/python3 _meta/scripts/vault_lint.py --fix
+```
+
+Checks: broken wikilinks, frontmatter validation, orphan pages, tag consistency, stale raw sources, naming conventions, empty files, missing cross-references.
+
+### Raw Source Ingestion
+
+Sources land in `raw/` with `status: raw` frontmatter. Template available at `raw/raw-source-template.md`. Subdirectories:
+- `raw/articles/` — web clippings
+- `raw/papers/` — paper notes
+- `raw/repos/` — repo dumps
+- `raw/datasets/` — dataset descriptions
+- `raw/images/` — downloaded images
+
+### Why FTS5
+
+- **Zero dependencies** beyond Python stdlib + sqlite3
+- **BM25 ranking** — industry standard for relevance
+- **Porter stemming** — matches morphology variants
+- **Sub-ms queries** at vault scale (hundreds of docs)
+- **Complements** the Claude Agent SDK tools, doesn't replace them
